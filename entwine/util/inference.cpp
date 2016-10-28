@@ -194,8 +194,11 @@ void Inference::add(const std::string localPath, FileInfo& fileInfo)
 
     auto update([&fileInfo](std::size_t numPoints, const BBox& bbox)
     {
-        fileInfo.numPoints(numPoints);
-        fileInfo.bbox(bbox);
+        if (numPoints)
+        {
+            fileInfo.numPoints(numPoints);
+            fileInfo.bbox(bbox);
+        }
     });
 
     if (preview)
