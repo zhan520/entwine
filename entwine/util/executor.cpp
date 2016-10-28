@@ -100,7 +100,7 @@ std::unique_ptr<Preview> Executor::preview(
     auto lock(getLock());
     const std::string driver(m_stageFactory->inferReaderDriver(path));
 
-    if (!driver.empty())
+    if (!driver.empty() && driver != "readers.text")
     {
         std::unique_ptr<pdal::Reader> reader(createReader(driver, path));
         if (reader)
