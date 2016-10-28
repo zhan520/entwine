@@ -109,6 +109,8 @@ std::unique_ptr<Preview> Executor::preview(
 
             if (quick.valid())
             {
+                if (!quick.m_pointCount) return result;
+
                 std::string srs;
 
                 BBox bbox(
@@ -195,9 +197,12 @@ std::unique_ptr<pdal::Reader> Executor::createReader(
                 static_cast<pdal::Reader*>(
                     m_stageFactory->createStage(driver)));
 
-        pdal::Options options;
-        options.add(pdal::Option("filename", path));
-        reader->setOptions(options);
+        if (reader)
+        {
+            pdal::Options options;
+            options.add(pdal::Option("filename", path));
+            reader->setOptions(options);
+        }
     }
     else
     {
