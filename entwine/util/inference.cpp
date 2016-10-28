@@ -183,9 +183,6 @@ void Inference::go()
     }
 
     m_done = true;
-
-    std::cout << "Inferred: " << manifest().toJson() << std::endl;
-    std::cout << "InfBounds: " << bbox() << std::endl;
 }
 
 void Inference::add(const std::string localPath, FileInfo& fileInfo)
