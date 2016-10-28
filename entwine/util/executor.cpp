@@ -109,7 +109,17 @@ std::unique_ptr<Preview> Executor::preview(
 
             if (quick.valid())
             {
-                if (!quick.m_pointCount) return result;
+                if (!quick.m_pointCount)
+                {
+                    result.reset(
+                        new Preview(
+                            BBox(),
+                            0,
+                            "",
+                            std::vector<std::string>()));
+
+                    return result;
+                }
 
                 std::string srs;
 
