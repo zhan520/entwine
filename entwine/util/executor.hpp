@@ -87,7 +87,7 @@ private:
             pdal::BasePointTable& pointTable) const;
 
     bool m_is3d;
-    std::unique_ptr<pdal::StageFactory> m_stageFactory;
+    pdal::StageFactory* m_stageFactory;
     mutable std::mutex m_factoryMutex;
 };
 
