@@ -13,7 +13,7 @@
 #include <cstddef>
 #include <memory>
 
-#include <entwine/third/json/json.hpp>
+#include <json/json.h>
 #include <entwine/tree/point-info.hpp>
 
 namespace entwine

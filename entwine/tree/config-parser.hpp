@@ -13,7 +13,7 @@
 #include <memory>
 #include <vector>
 
-#include <entwine/third/json/json.hpp>
+#include <json/json.h>
 
 namespace arbiter
 {

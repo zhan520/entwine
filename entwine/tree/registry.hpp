@@ -16,7 +16,7 @@
 #include <set>
 #include <vector>
 
-#include <entwine/third/json/json.hpp>
+#include <json/json.h>
 #include <entwine/tree/point-info.hpp>
 
 namespace arbiter

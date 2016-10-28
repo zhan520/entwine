@@ -8,6 +8,7 @@
 *
 ******************************************************************************/
 
+#include <entwine/third/arbiter/arbiter.hpp>
 #include <entwine/tree/builder.hpp>
 #include <entwine/tree/merger.hpp>
 #include <entwine/types/subset.hpp>

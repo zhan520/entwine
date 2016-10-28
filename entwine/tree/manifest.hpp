@@ -17,7 +17,7 @@
 #include <set>
 #include <string>
 
-#include <entwine/third/json/json.hpp>
+#include <json/json.h>
 #include <entwine/types/bbox.hpp>
 
 namespace entwine

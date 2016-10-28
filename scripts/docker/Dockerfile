@@ -1,4 +1,4 @@
-FROM connormanning/pdal:docker-master
+FROM connormanning/pdal:grid-maintenance
 MAINTAINER Connor Manning <connor@hobu.co>
 
 ENV CC clang
@@ -6,6 +6,7 @@ ENV CXX clang++
 
 RUN git clone https://github.com/connormanning/entwine.git && \
     cd entwine && \
+    git checkout grid-maintenance && \
     mkdir build && \
     cd build && \
     cmake -G "Unix Makefiles" \

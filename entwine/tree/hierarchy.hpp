@@ -15,7 +15,8 @@
 #include <map>
 #include <string>
 
-#include <entwine/third/json/json.hpp>
+#include <json/json.h>
+#include <entwine/third/arbiter/arbiter.hpp>
 #include <entwine/tree/point-info.hpp>
 #include <entwine/types/bbox.hpp>
 
