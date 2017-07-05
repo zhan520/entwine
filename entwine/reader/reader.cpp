@@ -155,6 +155,23 @@ void Reader::init()
             m_ready = true;
         });
     }
+
+    if (m_endpoint.tryGetSize("scales.json"))
+    {
+        const Json::Value scales(parse(m_endpoint.get("scales.json")));
+        if (scales.size() == m_metadata.manifest().size())
+        {
+            for (const auto& s : scales)
+            {
+                m_scales.push_back(s.asDouble());
+            }
+            std::cout << "Using I-scaling" << std::endl;
+        }
+        else
+        {
+            std::cout << "Not using I-scaling: mismatched size" << std::endl;
+        }
+    }
 }
 
 bool Reader::exists(const QueryChunkState& c) const

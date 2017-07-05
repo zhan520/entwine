@@ -137,6 +137,7 @@ public:
     const BaseChunkReader* base() const { return m_base.get(); }
     const arbiter::Endpoint& endpoint() const { return m_endpoint; }
     bool exists(const QueryChunkState& state) const;
+    const std::vector<double>& scales() const { return m_scales; }
 
 private:
     void init();
@@ -164,6 +165,8 @@ private:
 
     mutable std::mutex m_mutex;
     mutable std::map<Id, bool> m_pre;
+
+    std::vector<double> m_scales;
 };
 
 } // namespace entwine

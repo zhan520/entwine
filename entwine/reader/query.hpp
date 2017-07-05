@@ -141,7 +141,46 @@ protected:
     void getFetches(const QueryChunkState& chunkState);
     void getBase(std::vector<char>& buffer, const PointState& pointState);
 
-    template<typename T> void setSpatial(char* pos, double d)
+    void convertAndSet(char* pos, double d, pdal::Dimension::Type t)
+    {
+        switch (t)
+        {
+            case pdal::Dimension::Type::Double:
+                std::memcpy(pos, &d, 8);
+                break;
+            case pdal::Dimension::Type::Float:
+                set<float>(pos, d);
+                break;
+            case pdal::Dimension::Type::Unsigned8:
+                set<uint8_t>(pos, d);
+                break;
+            case pdal::Dimension::Type::Signed8:
+                set<int8_t>(pos, d);
+                break;
+            case pdal::Dimension::Type::Unsigned16:
+                set<uint16_t>(pos, d);
+                break;
+            case pdal::Dimension::Type::Signed16:
+                set<int16_t>(pos, d);
+                break;
+            case pdal::Dimension::Type::Unsigned32:
+                set<uint32_t>(pos, d);
+                break;
+            case pdal::Dimension::Type::Signed32:
+                set<int32_t>(pos, d);
+                break;
+            case pdal::Dimension::Type::Unsigned64:
+                set<uint64_t>(pos, d);
+                break;
+            case pdal::Dimension::Type::Signed64:
+                set<int64_t>(pos, d);
+                break;
+            default:
+                break;
+        }
+    }
+
+    template<typename T> void set(char* pos, double d)
     {
         const T v(d);
         std::memcpy(pos, &v, sizeof(T));

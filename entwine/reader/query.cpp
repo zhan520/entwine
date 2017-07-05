@@ -10,6 +10,7 @@
 
 #include <entwine/reader/query.hpp>
 
+#include <cstdlib>
 #include <iterator>
 #include <limits>
 
@@ -21,6 +22,7 @@
 #include <entwine/tree/chunk.hpp>
 #include <entwine/tree/climber.hpp>
 #include <entwine/types/dir.hpp>
+#include <entwine/types/manifest.hpp>
 #include <entwine/types/metadata.hpp>
 #include <entwine/types/schema.hpp>
 #include <entwine/types/tube.hpp>
@@ -251,6 +253,8 @@ bool Query::processPoint(std::vector<char>& buffer, const PointInfo& info)
         std::size_t dimNum(0);
         const auto& mid(m_reader.metadata().boundsScaledCubic().mid());
 
+        using D = pdal::Dimension::Id;
+
         for (const auto& dim : m_outSchema.dims())
         {
             // Subtract one to ignore Dimension::Id::Unknown.
@@ -273,41 +277,19 @@ bool Query::processPoint(std::vector<char>& buffer, const PointInfo& info)
                         m_delta->scale()[dimNum],
                         m_delta->offset()[dimNum]);
 
-                switch (dim.type())
-                {
-                    case pdal::Dimension::Type::Double:
-                        std::memcpy(pos, &d, 8);
-                        break;
-                    case pdal::Dimension::Type::Float:
-                        setSpatial<float>(pos, d);
-                        break;
-                    case pdal::Dimension::Type::Unsigned8:
-                        setSpatial<uint8_t>(pos, d);
-                        break;
-                    case pdal::Dimension::Type::Signed8:
-                        setSpatial<int8_t>(pos, d);
-                        break;
-                    case pdal::Dimension::Type::Unsigned16:
-                        setSpatial<uint16_t>(pos, d);
-                        break;
-                    case pdal::Dimension::Type::Signed16:
-                        setSpatial<int16_t>(pos, d);
-                        break;
-                    case pdal::Dimension::Type::Unsigned32:
-                        setSpatial<uint32_t>(pos, d);
-                        break;
-                    case pdal::Dimension::Type::Signed32:
-                        setSpatial<int32_t>(pos, d);
-                        break;
-                    case pdal::Dimension::Type::Unsigned64:
-                        setSpatial<uint64_t>(pos, d);
-                        break;
-                    case pdal::Dimension::Type::Signed64:
-                        setSpatial<int64_t>(pos, d);
-                        break;
-                    default:
-                        break;
-                }
+                convertAndSet(pos, d, dim.type());
+            }
+            else if (m_reader.scales().size() && dim.id() == D::Intensity)
+            {
+                const Origin origin(
+                        m_pointRef.getFieldAs<std::size_t>(D::OriginId));
+
+                const double scale = m_reader.scales().at(origin);
+
+                const double val =
+                    m_pointRef.getFieldAs<double>(D::Intensity) * scale;
+
+                convertAndSet(pos, val, dim.type());
             }
             else
             {
