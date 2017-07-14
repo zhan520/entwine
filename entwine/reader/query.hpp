@@ -147,7 +147,12 @@ protected:
         std::memcpy(pos, &v, sizeof(T));
     }
 
-    bool processPoint(std::vector<char>& buffer, const PointInfo& info);
+    void processPoint(std::vector<char>& buffer, const PointInfo& info);
+
+    void processPoint(
+            std::vector<char>& buffer,
+            const Point& point,
+            const char* data);
 
     const Reader& m_reader;
     const Structure& m_structure;

@@ -16,6 +16,7 @@
 #include <vector>
 
 #include <entwine/types/point-pool.hpp>
+#include <entwine/types/tube.hpp>
 
 namespace entwine
 {
@@ -53,6 +54,10 @@ private:
 
 using TubeData = std::vector<PointInfo>;
 
+using Inner = std::map<std::size_t, std::vector<const Cell*>>;
+using Middle = std::map<std::size_t, Inner>;
+using Multi = std::map<std::size_t, Middle>;
+
 // Ordered by Z-tick to perform the tubular-quadtree-as-octree query.
 class ChunkReader
 {
@@ -77,6 +82,41 @@ public:
     };
 
     QueryRange candidates(const Bounds& queryBounds) const;
+
+    template<typename F>
+    void range(const Bounds& queryBounds, F f) const
+    {
+        const auto& gb(globalBounds());
+        const auto min(Tube::calcAllTicks(queryBounds.min(), gb, m_depth));
+        auto max(Tube::calcAllTicks(queryBounds.max(), gb, m_depth));
+
+        for (
+                auto outIt = m_map.lower_bound(min[2]);
+                outIt != m_map.upper_bound(max[2]);
+                ++outIt)
+        {
+            const auto& middle(outIt->second);
+            for (
+                    auto midIt = middle.lower_bound(min[1]);
+                    midIt != middle.upper_bound(max[1]);
+                    ++midIt)
+            {
+                const auto& inner(midIt->second);
+                for (
+                        auto inIt = inner.lower_bound(min[0]);
+                        inIt != inner.upper_bound(max[0]);
+                        ++inIt)
+                {
+                    const auto& vec(inIt->second);
+                    for (const auto& c : vec)
+                    {
+                        f(*c);
+                    }
+                }
+            }
+        }
+    }
+
     std::size_t size() const
     {
         return m_cells.size() * m_schema.pointSize();
@@ -85,6 +125,7 @@ public:
     const Id& id() const { return m_id; }
 
 private:
+    const Bounds& globalBounds() const;
     const Schema& schema() const { return m_schema; }
 
     std::size_t normalize(const Id& rawIndex) const
@@ -100,7 +141,7 @@ private:
     const std::size_t m_depth;
 
     Cell::PooledStack m_cells;
-    TubeData m_points;
+    Multi m_map;
 };
 
 // Ordered by normal BaseChunk ordering for traversal.
@@ -108,7 +149,7 @@ class BaseChunkReader
 {
 public:
     BaseChunkReader(const Metadata& m, PointPool& pool);
-    ~BaseChunkReader();
+    virtual ~BaseChunkReader();
 
     const TubeData& tubeData(const Id& id) const
     {

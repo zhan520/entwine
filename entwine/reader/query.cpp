@@ -176,7 +176,7 @@ void Query::getBase(std::vector<char>& buffer, const PointState& pointState)
         {
             for (const PointInfo& pointInfo : cell)
             {
-                if (processPoint(buffer, pointInfo)) ++m_numPoints;
+                processPoint(buffer, pointInfo);
             }
         }
     }
@@ -214,14 +214,10 @@ void Query::getChunked(std::vector<char>& buffer)
     {
         if (const ChunkReader* cr = m_chunkReaderIt->second)
         {
-            ChunkReader::QueryRange range(cr->candidates(m_queryBounds));
-            auto it(range.begin);
-
-            while (it != range.end)
+            cr->range(m_queryBounds, [this, &buffer](const Cell& cell)
             {
-                if (processPoint(buffer, *it)) ++m_numPoints;
-                ++it;
-            }
+                processPoint(buffer, cell.point(), cell.uniqueData());
+            });
 
             if (++m_chunkReaderIt == m_block->chunkMap().end())
             {
@@ -237,91 +233,91 @@ void Query::getChunked(std::vector<char>& buffer)
     m_done = !m_block && m_chunks.empty();
 }
 
-bool Query::processPoint(std::vector<char>& buffer, const PointInfo& info)
+void Query::processPoint(std::vector<char>& buffer, const PointInfo& info)
 {
-    if (m_queryBounds.contains(info.point()))
+    processPoint(buffer, info.point(), info.data());
+}
+
+void Query::processPoint(
+        std::vector<char>& buffer,
+        const Point& point,
+        const char* data)
+{
+    if (!m_queryBounds.contains(point)) return;
+    m_table.setPoint(data);
+    if (!m_filter.check(m_pointRef)) return;
+
+    ++m_numPoints;
+    buffer.resize(buffer.size() + m_outSchema.pointSize(), 0);
+    char* pos(buffer.data() + buffer.size() - m_outSchema.pointSize());
+
+    std::size_t dimNum(0);
+    const auto& mid(m_reader.metadata().boundsScaledCubic().mid());
+
+    for (const auto& dim : m_outSchema.dims())
     {
-        m_table.setPoint(info.data());
+        // Subtract one to ignore Dimension::Id::Unknown.
+        dimNum = pdal::Utils::toNative(dim.id()) - 1;
 
-        if (!m_filter.check(m_pointRef)) return false;
-
-        buffer.resize(buffer.size() + m_outSchema.pointSize(), 0);
-        char* pos(buffer.data() + buffer.size() - m_outSchema.pointSize());
-
-        std::size_t dimNum(0);
-        const auto& mid(m_reader.metadata().boundsScaledCubic().mid());
-
-        for (const auto& dim : m_outSchema.dims())
+        // Up to this point, everything has been in our local coordinate
+        // system.  Query bounds were transformed to match our local view
+        // of the world, as well as spatial attributes in the filter.  Now
+        // that we've selected a point in our own local space, finally we
+        // will transform that selection into user-requested space.
+        if (m_delta && dimNum < 3)
         {
-            // Subtract one to ignore Dimension::Id::Unknown.
-            dimNum = pdal::Utils::toNative(dim.id()) - 1;
+            double d(m_pointRef.getFieldAs<double>(dim.id()));
 
-            // Up to this point, everything has been in our local coordinate
-            // system.  Query bounds were transformed to match our local view
-            // of the world, as well as spatial attributes in the filter.  Now
-            // that we've selected a point in our own local space, finally we
-            // will transform that selection into user-requested space.
-            if (m_delta && dimNum < 3)
+            // Center the point around the origin, scale it, then un-center
+            // it and apply the user's offset from the origin bounds center.
+            d = Point::scale(
+                    d,
+                    mid[dimNum],
+                    m_delta->scale()[dimNum],
+                    m_delta->offset()[dimNum]);
+
+            switch (dim.type())
             {
-                double d(m_pointRef.getFieldAs<double>(dim.id()));
-
-                // Center the point around the origin, scale it, then un-center
-                // it and apply the user's offset from the origin bounds center.
-                d = Point::scale(
-                        d,
-                        mid[dimNum],
-                        m_delta->scale()[dimNum],
-                        m_delta->offset()[dimNum]);
-
-                switch (dim.type())
-                {
-                    case pdal::Dimension::Type::Double:
-                        std::memcpy(pos, &d, 8);
-                        break;
-                    case pdal::Dimension::Type::Float:
-                        setSpatial<float>(pos, d);
-                        break;
-                    case pdal::Dimension::Type::Unsigned8:
-                        setSpatial<uint8_t>(pos, d);
-                        break;
-                    case pdal::Dimension::Type::Signed8:
-                        setSpatial<int8_t>(pos, d);
-                        break;
-                    case pdal::Dimension::Type::Unsigned16:
-                        setSpatial<uint16_t>(pos, d);
-                        break;
-                    case pdal::Dimension::Type::Signed16:
-                        setSpatial<int16_t>(pos, d);
-                        break;
-                    case pdal::Dimension::Type::Unsigned32:
-                        setSpatial<uint32_t>(pos, d);
-                        break;
-                    case pdal::Dimension::Type::Signed32:
-                        setSpatial<int32_t>(pos, d);
-                        break;
-                    case pdal::Dimension::Type::Unsigned64:
-                        setSpatial<uint64_t>(pos, d);
-                        break;
-                    case pdal::Dimension::Type::Signed64:
-                        setSpatial<int64_t>(pos, d);
-                        break;
-                    default:
-                        break;
-                }
+                case pdal::Dimension::Type::Double:
+                    std::memcpy(pos, &d, 8);
+                    break;
+                case pdal::Dimension::Type::Float:
+                    setSpatial<float>(pos, d);
+                    break;
+                case pdal::Dimension::Type::Unsigned8:
+                    setSpatial<uint8_t>(pos, d);
+                    break;
+                case pdal::Dimension::Type::Signed8:
+                    setSpatial<int8_t>(pos, d);
+                    break;
+                case pdal::Dimension::Type::Unsigned16:
+                    setSpatial<uint16_t>(pos, d);
+                    break;
+                case pdal::Dimension::Type::Signed16:
+                    setSpatial<int16_t>(pos, d);
+                    break;
+                case pdal::Dimension::Type::Unsigned32:
+                    setSpatial<uint32_t>(pos, d);
+                    break;
+                case pdal::Dimension::Type::Signed32:
+                    setSpatial<int32_t>(pos, d);
+                    break;
+                case pdal::Dimension::Type::Unsigned64:
+                    setSpatial<uint64_t>(pos, d);
+                    break;
+                case pdal::Dimension::Type::Signed64:
+                    setSpatial<int64_t>(pos, d);
+                    break;
+                default:
+                    break;
             }
-            else
-            {
-                m_pointRef.getField(pos, dim.id(), dim.type());
-            }
-
-            pos += dim.size();
+        }
+        else
+        {
+            m_pointRef.getField(pos, dim.id(), dim.type());
         }
 
-        return true;
-    }
-    else
-    {
-        return false;
+        pos += dim.size();
     }
 }
 

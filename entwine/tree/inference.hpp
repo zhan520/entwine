@@ -89,6 +89,7 @@ public:
     std::size_t numPoints() const;
     const Reprojection* reprojection() const { return m_reproj.get(); }
     const Delta* delta() const { return m_delta.get(); }
+    double density() const { return densityLowerBound(fileInfo()); }
 
     const std::vector<double>* transformation() const
     {

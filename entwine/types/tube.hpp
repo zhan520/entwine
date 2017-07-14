@@ -81,6 +81,29 @@ public:
                     (bounds.max().z - bounds.min().z));
     }
 
+    static std::size_t calcTick(
+            const Point& point,
+            const Bounds& bounds,
+            const std::size_t depth,
+            const std::size_t index)
+    {
+        return
+            std::floor(
+                    (point[index] - bounds.min()[index]) * (1ULL << depth) /
+                    (bounds.max()[index] - bounds.min()[index]));
+    }
+
+    static Point calcAllTicks(
+            const Point& point,
+            const Bounds& bounds,
+            const std::size_t depth)
+    {
+        return Point(
+                calcTick(point, bounds, depth, 0),
+                calcTick(point, bounds, depth, 1),
+                calcTick(point, bounds, depth, 2));
+    }
+
     Cells::iterator begin() { return m_cells.begin(); }
     Cells::iterator end() { return m_cells.end(); }
     Cells::const_iterator begin() const { return m_cells.begin(); }
