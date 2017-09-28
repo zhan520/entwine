@@ -11,8 +11,9 @@ Entwine
 Entwine is a data organization library for massive point clouds, designed to
 conquer datasets of hundreds of billions of points as well as desktop-scale
 point clouds.  Entwine can index anything that is `PDAL`_-readable, and can
-read/write to a variety of sources like S3 or Dropbox.  Builds are completely
-lossless, so no points will be discarded even for terabyte-scale datasets.
+read/write to a variety of sources like S3, GCS, or Dropbox.  Builds are
+completely lossless, so no points will be discarded even for terabyte-scale
+datasets.
 
 You can see it in use via the dynamic `Plas.io`_ client at http://speck.ly and
 the `Potree`_ client at http://potree.entwine.io.
@@ -31,6 +32,12 @@ Entwine is available under the `LGPL License`_.
 
 News
 --------------------------------------------------------------------------------
+
+**05-15-2017**
+................................................................................
+
+Entwine 1.1.0 is now released. See :ref:`download` to obtain a copy of the source
+code.
 
 **03-03-2017**
 ................................................................................
@@ -52,6 +59,15 @@ Infrastructure`_ at `FOSS4G 2016`_ in Bonn, Germany on August 26th, 2016.
 .. note::
 
     Catch up with Connor to get a :ref:`PDAL <pdal:home>` or :ref:`Entwine <home>` sticker.
+
+
+About
+--------------------------------------------------------------------------------
+
+.. toctree::
+   :maxdepth: 2
+
+  about
 
 
 Quickstart
@@ -77,8 +93,6 @@ Community
    :maxdepth: 2
 
    community
-
-
 
 
 
