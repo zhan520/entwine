@@ -40,10 +40,13 @@ public:
     const Bounds& bounds() const { return m_sub; }
 
     std::string postfix() const { return "-" + std::to_string(m_id); }
+    static std::string postfix(std::size_t subsetId)
+    {
+        return "-" + std::to_string(subsetId);
+    }
     static std::string postfix(const std::size_t* subsetId)
     {
-        if (subsetId) return "-" + std::to_string(*subsetId);
-        else return "";
+        return subsetId ? postfix(*subsetId) : "";
     }
 
     bool primary() const { return !m_id; }

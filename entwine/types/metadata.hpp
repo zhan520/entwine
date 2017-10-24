@@ -43,6 +43,7 @@ class Metadata
     friend class Sequence;
 
 public:
+    /*
     Metadata(
             const Bounds& nativeBounds,
             const Schema& schema,
@@ -60,6 +61,7 @@ public:
             const cesium::Settings* cesiumSettings = nullptr,
             std::vector<std::string> preserveSpatial =
                 std::vector<std::string>());
+    */
 
     Metadata(
             const arbiter::Endpoint& endpoint,

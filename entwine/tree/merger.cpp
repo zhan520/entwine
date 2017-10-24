@@ -20,27 +20,12 @@
 namespace entwine
 {
 
-Merger::Merger(
-        const std::string path,
-        const std::size_t threads,
-        const bool verbose,
-        std::shared_ptr<arbiter::Arbiter> arbiter)
-    : m_builder()
-    , m_path(path)
-    , m_threads(threads)
-    , m_outerScope(makeUnique<OuterScope>())
-    , m_verbose(verbose)
+Merger::Merger(const Config& config)
+    : m_config(config)
 {
-    m_outerScope->setArbiter(arbiter);
-
-    const std::size_t zero(0);
-    m_builder = Builder::tryCreateExisting(
-            m_path,
-            ".",
-            ThreadPools::getWorkThreads(threads),
-            ThreadPools::getClipThreads(threads),
-            &zero,
-            *m_outerScope);
+    m_outerScope.getArbiter(config.arbiter());
+    m_config.setSubsetId(0);
+    m_builder = Builder::tryCreateExisting(m_config, m_outerScope);
 
     if (!m_builder)
     {
@@ -52,22 +37,21 @@ Merger::Merger(
                 "This path is already whole - no merge needed");
     }
 
-    m_builder->verbose(m_verbose);
-    m_outerScope->setPointPool(m_builder->sharedPointPool());
-    m_outerScope->setHierarchyPool(m_builder->sharedHierarchyPool());
+    m_outerScope.setPointPool(m_builder->sharedPointPool());
+    m_outerScope.setHierarchyPool(m_builder->sharedHierarchyPool());
 
     if (const Subset* subset = m_builder->metadata().subset())
     {
-        m_of = subset->of();
+        m_config.setSubsetOf(subset->of());
     }
     else
     {
         throw std::runtime_error("Could not get number of subsets");
     }
 
-    if (m_verbose)
+    if (m_config.verbose())
     {
-        std::cout << "Awakened 1 / " << total() << std::endl;
+        std::cout << "Awakened 1 / " << m_config.of() << std::endl;
     }
 }
 
@@ -77,34 +61,29 @@ void Merger::go()
 {
     m_builder->unbump();
 
-    Pool pool(m_threads);
+    Pool pool(m_config.threads());
     std::size_t fetches(static_cast<float>(pool.size()) * 1.2);
 
-    while (m_pos < total())
+    while (m_config.id() < m_config.of())
     {
-        const std::size_t n(std::min(fetches, total() - m_pos));
+        const std::size_t n(std::min(fetches, m_config.of() - m_config.id()));
         std::vector<std::unique_ptr<Builder>> builders(n);
 
         for (auto& b : builders)
         {
-            const std::size_t id(m_pos++);
-            if (m_verbose)
+            m_config.setSubsetId(m_config.id() + 1);
+
+            if (m_config.verbose())
             {
-                std::cout << "Merging " << m_pos << " / " << total() <<
-                    std::endl;
+                std::cout << "Merging " << m_config.id() << " / " <<
+                    m_config.of() << std::endl;
             }
 
-            pool.add([this, &b, id]()
+            const Config copy(m_config);
+            pool.add([this, &b, copy]()
             {
-                b = Builder::tryCreateExisting(
-                        m_path,
-                        ".",
-                        ThreadPools::getWorkThreads(m_threads),
-                        ThreadPools::getClipThreads(m_threads),
-                        &id,
-                        *m_outerScope);
-
-                if (!b) std::cout << "Create failed: " << id << std::endl;
+                b = Builder::tryCreateExisting(copy, m_outerScope);
+                if (!b) std::cout << "Failed: " << copy.id() << std::endl;
             });
         }
 
@@ -113,17 +92,16 @@ void Merger::go()
         for (auto& b : builders)
         {
             if (!b) throw std::runtime_error("Couldn't create subset");
-            b->verbose(m_verbose);
             m_builder->merge(*b);
         }
     }
 
     m_builder->makeWhole();
 
-    if (m_verbose) std::cout << "Merge complete.  Saving..." << std::endl;
+    if (m_config.verbose()) std::cout << "Merged.  Saving..." << std::endl;
     m_builder->save();
     m_builder.reset();
-    if (m_verbose) std::cout << "\tFinal save complete." << std::endl;
+    if (m_config.verbose()) std::cout << "\tFinal save complete." << std::endl;
 }
 
 } // namespace entwine

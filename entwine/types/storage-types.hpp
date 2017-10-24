@@ -96,13 +96,11 @@ inline std::string toString(ChunkStorageType c)
 
 inline ChunkStorageType toChunkStorageType(const Json::Value& j)
 {
-    if (j.isNull() || j.asString() == "none" || j.asString() == "binary")
-    {
-        return ChunkStorageType::Binary;
-    }
+    if (j.isNull()) return ChunkStorageType::LasZip;
 
     const std::string s(j.asString());
-    if (s == "laszip") return ChunkStorageType::LasZip;
+    if (s == "laszip" || s == "") return ChunkStorageType::LasZip;
+    if (s == "none" || s == "binary") return ChunkStorageType::Binary;
     if (s == "lazperf") return ChunkStorageType::LazPerf;
     throw std::runtime_error("Invalid compression: " + j.toStyledString());
 }
@@ -138,6 +136,7 @@ inline std::string toString(HierarchyCompression c)
 
 inline HierarchyCompression toHierarchyCompression(const std::string& s)
 {
+    if (s == "") return HierarchyCompression::Lzma;
     if (s == "lzma") return HierarchyCompression::Lzma;
     if (s == "none") return HierarchyCompression::None;
     throw std::runtime_error("Invalid hierarchy compression: " + s);

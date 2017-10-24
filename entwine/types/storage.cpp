@@ -27,6 +27,7 @@
 namespace entwine
 {
 
+/*
 Storage::Storage(
         const Metadata& metadata,
         const ChunkStorageType chunkStorageType,
@@ -37,6 +38,7 @@ Storage::Storage(
 {
     m_storage = ChunkStorage::create(m_metadata, m_chunkStorageType);
 }
+*/
 
 Storage::Storage(const Metadata& metadata, const Json::Value& json)
     : m_metadata(metadata)

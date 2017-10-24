@@ -22,6 +22,7 @@ namespace arbiter { class Arbiter; }
 
 class Bounds;
 class Builder;
+class Config;
 class Delta;
 class Manifest;
 class Subset;
@@ -39,16 +40,14 @@ public:
 
 private:
     static void normalizeInput(
-            Json::Value& json,
+            Config& config,
             const arbiter::Arbiter& arbiter);
 
     static std::unique_ptr<Builder> tryGetExisting(
-            const Json::Value& config,
-            std::shared_ptr<arbiter::Arbiter> arbiter,
-            const std::string& outPath,
-            const std::string& tmpPath,
-            std::size_t workThreads,
-            std::size_t clipThreads);
+            const Config& config,
+            std::shared_ptr<arbiter::Arbiter> arbiter);
+
+    static void infer(Config& config);
 
     static std::unique_ptr<Subset> maybeAccommodateSubset(
             Json::Value& json,

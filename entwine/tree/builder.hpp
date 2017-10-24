@@ -41,6 +41,7 @@ namespace arbiter
 
 class Bounds;
 class Clipper;
+class Config;
 class Executor;
 class FileInfo;
 class Metadata;
@@ -60,6 +61,13 @@ class Builder
     friend class Sequence;
 
 public:
+    Builder(const Config& config, OuterScope outerScope = OuterScope());
+
+    static std::unique_ptr<Builder> tryCreateExisting(
+            const Config& config,
+            OuterScope outerScope = OuterScope());
+
+    /*
     // Launch a new build.
     Builder(
             const Metadata& metadata,
@@ -71,12 +79,10 @@ public:
 
     // Continue an existing build.
     Builder(
-            std::string outPath,
-            std::string tmpPath,
-            std::size_t workThreads,
-            std::size_t clipThreads,
-            const std::size_t* subsetId = nullptr,
+            const Config& config,
+            const std::size_t* subsetId,
             OuterScope outerScope = OuterScope());
+    */
 
     ~Builder();
 
@@ -101,7 +107,7 @@ public:
     std::shared_ptr<PointPool> sharedPointPool() const;
     std::shared_ptr<HierarchyCell::Pool> sharedHierarchyPool() const;
 
-    bool isContinuation() const { return m_isContinuation; }
+    bool isContinuation() const { return m_exists; }
 
     const arbiter::Endpoint& outEndpoint() const;
     const arbiter::Endpoint& tmpEndpoint() const;
@@ -114,14 +120,6 @@ public:
 
     bool verbose() const { return m_verbose; }
     void verbose(bool v) { m_verbose = v; }
-
-    static std::unique_ptr<Builder> tryCreateExisting(
-            std::string path,
-            std::string tmp,
-            std::size_t workThreads,
-            std::size_t clipThreads,
-            const std::size_t* subsetId = nullptr,
-            OuterScope outerScope = OuterScope());
 
 private:
     std::mutex& mutex();
@@ -160,14 +158,14 @@ private:
     //
 
     std::shared_ptr<arbiter::Arbiter> m_arbiter;
-    std::unique_ptr<arbiter::Endpoint> m_outEndpoint;
-    std::unique_ptr<arbiter::Endpoint> m_tmpEndpoint;
+    std::unique_ptr<arbiter::Endpoint> m_outEp;
+    std::unique_ptr<arbiter::Endpoint> m_tmpEp;
+    bool m_exists;
 
     std::unique_ptr<ThreadPools> m_threadPools;
     std::unique_ptr<Metadata> m_metadata;
 
     mutable std::mutex m_mutex;
-    bool m_isContinuation;
 
     mutable std::shared_ptr<PointPool> m_pointPool;
     mutable std::shared_ptr<HierarchyCell::Pool> m_hierarchyPool;

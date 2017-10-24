@@ -37,10 +37,12 @@ class Metadata;
 class Storage
 {
 public:
+    /*
     Storage(
             const Metadata& metadata,
             ChunkStorageType compression = ChunkStorageType::LasZip,
             HierarchyCompression hc = HierarchyCompression::Lzma);
+            */
     Storage(const Metadata& metadata, const Storage& other);
     Storage(const Metadata& metadata, const Json::Value& json);
     Storage(const Storage&) = delete;

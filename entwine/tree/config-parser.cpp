@@ -8,15 +8,16 @@
 *
 ******************************************************************************/
 
+#include <entwine/tree/config-parser.hpp>
+
 #include <cmath>
 #include <limits>
 #include <numeric>
 
-#include <entwine/tree/config-parser.hpp>
-
 #include <entwine/formats/cesium/settings.hpp>
 #include <entwine/third/arbiter/arbiter.hpp>
 #include <entwine/tree/builder.hpp>
+#include <entwine/tree/config.hpp>
 #include <entwine/tree/inference.hpp>
 #include <entwine/tree/thread-pools.hpp>
 #include <entwine/types/bounds.hpp>
@@ -42,31 +43,15 @@ namespace
 namespace
 {
     Json::Reader reader;
-
-    std::unique_ptr<cesium::Settings> getCesiumSettings(const Json::Value& json)
-    {
-        std::unique_ptr<cesium::Settings> settings;
-
-        if (json.isMember("cesium"))
-        {
-            settings = makeUnique<cesium::Settings>(json["cesium"]);
-        }
-
-        return settings;
-    }
 }
 
 Json::Value ConfigParser::defaults()
 {
     Json::Value json;
 
-    json["input"] = Json::Value::null;
-    json["output"] = Json::Value::null;
     json["tmp"] = arbiter::fs::getTempPath();
     json["threads"] = 8;
     json["trustHeaders"] = true;
-    json["prefixIds"] = false;
-    json["storage"] = "laszip";
 
     if (!shallow)
     {
@@ -87,61 +72,41 @@ Json::Value ConfigParser::defaults()
 }
 
 std::unique_ptr<Builder> ConfigParser::getBuilder(
-        Json::Value json,
+        Json::Value j,
         std::shared_ptr<arbiter::Arbiter> arbiter)
 {
-    if (!arbiter) arbiter = std::make_shared<arbiter::Arbiter>();
+    Config config(j);
 
-    const bool verbose(json["verbose"].asBool());
+    if (!arbiter)
+    {
+        arbiter = std::make_shared<arbiter::Arbiter>(config.arbiter());
+    }
 
     const Json::Value d(defaults());
     for (const auto& k : d.getMemberNames())
     {
-        if (!json.isMember(k)) json[k] = d[k];
+        if (!config.isMember(k)) config[k] = d[k];
     }
 
+    /*
     const std::string out(json["output"].asString());
     const std::string tmp(json["tmp"].asString());
     const std::vector<std::string> preserveSpatial(
             extract<std::string>(json["preserveSpatial"]));
 
-    std::size_t workThreads(0);
-    std::size_t clipThreads(0);
-
-    if (json.isMember("threads"))
-    {
-        if (json["threads"].isNumeric())
-        {
-            const std::size_t threads(json["threads"].asUInt64());
-            workThreads = ThreadPools::getWorkThreads(threads);
-            clipThreads = ThreadPools::getClipThreads(threads);
-        }
-        else if (json["threads"].isArray())
-        {
-            workThreads = json["threads"][0].asUInt64();
-            clipThreads = json["threads"][1].asUInt64();
-        }
-    }
-
     const auto outType(arbiter::Arbiter::getType(out));
     if (outType == "s3" || outType == "gs") json["prefixIds"] = true;
+    */
 
-    normalizeInput(json, *arbiter);
-    auto fileInfo(extract<FileInfo>(json["input"]));
+    normalizeInput(config, *arbiter);
+    auto fileInfo(extract<FileInfo>(config["input"]));
 
-    if (!json["force"].asBool())
+    if (!config.force())
     {
-        if (auto builder = tryGetExisting(
-                    json,
-                    arbiter,
-                    out,
-                    tmp,
-                    workThreads,
-                    clipThreads))
+        if (auto builder = tryGetExisting(config, arbiter))
         {
-            if (verbose)
+            if (config.verbose())
             {
-                builder->verbose(true);
                 std::cout << "Scanning for new files..." << std::endl;
             }
 
@@ -164,57 +129,27 @@ std::unique_ptr<Builder> ConfigParser::getBuilder(
             //
             // It's plausible that the input field could be empty to continue
             // a previous build.
-            if (json["input"].isArray()) builder->append(fileInfo);
+            if (config["input"].isArray()) builder->append(fileInfo);
             return builder;
         }
     }
 
-    if (json["absolute"].asBool() && json["storage"].asString() == "laszip")
+    if (config.absolute() && config.storage() == "laszip")
     {
-        json["storage"] = "lazperf";
+        config["storage"] = "lazperf";
     }
 
-    const auto storage(toChunkStorageType(json["storage"]));
-    const bool trustHeaders(json["trustHeaders"].asBool());
-    const bool storePointId(json["storePointId"].asBool());
-    auto cesiumSettings(getCesiumSettings(json["formats"]));
-    bool absolute(json["absolute"].asBool());
-
-    if (cesiumSettings)
-    {
-        json["reprojection"]["out"] = "EPSG:4978";
-    }
-
-    auto reprojection(maybeCreate<Reprojection>(json["reprojection"]));
-
-    std::unique_ptr<std::vector<double>> transformation;
-    std::unique_ptr<Delta> delta;
-    if (!absolute && Delta::existsIn(json)) delta = makeUnique<Delta>(json);
-
-    // If we're building from an inference, then we already have these.  A user
-    // could have also pre-supplied them in the config.
-    //
-    // Either way, these three values are prerequisites for building, so if
-    // we're missing any we'll need to infer them from the files.
-    std::size_t numPointsHint(json["numPointsHint"].asUInt64());
-    auto boundsConforming(maybeCreate<Bounds>(json["bounds"]));
-    auto schema(maybeCreate<Schema>(json["schema"]));
-
-    if (json.isMember("transformation"))
-    {
-        transformation = makeUnique<std::vector<double>>(
-                extract<double>(json["transformation"]));
-    }
+    if (config.cesiumSettings()) config["reprojection"]["out"] = "EPSG:4978";
 
     const bool needsInference(
-            !boundsConforming ||
-            !schema ||
-            !numPointsHint ||
-            (!absolute && !delta));
+            !config.has("numPointsHint") ||
+            !config.has("bounds") ||
+            !config.has("schema") ||
+            (!config.has("absolute") && !Delta::existsIn(config.get())));
 
     if (needsInference)
     {
-        if (verbose)
+        if (config.verbose())
         {
             std::cout << "Performing dataset inference..." << std::endl;
         }
@@ -364,12 +299,12 @@ std::unique_ptr<Builder> ConfigParser::getBuilder(
     }
 
     Structure hierarchyStructure(Hierarchy::structure(structure, subset.get()));
-    const HierarchyCompression hierarchyCompression(HierarchyCompression::Lzma);
 
     const auto ep(arbiter->getEndpoint(json["output"].asString()));
     const Manifest manifest(fileInfo, ep);
 
-    const Metadata metadata(
+    const Metadata metadata(json);
+    /*
             *boundsConforming,
             *schema,
             structure,
@@ -385,6 +320,7 @@ std::unique_ptr<Builder> ConfigParser::getBuilder(
             transformation.get(),
             cesiumSettings.get(),
             preserveSpatial);
+    */
 
     OuterScope outerScope;
     outerScope.setArbiter(arbiter);
@@ -402,39 +338,17 @@ std::unique_ptr<Builder> ConfigParser::getBuilder(
 }
 
 std::unique_ptr<Builder> ConfigParser::tryGetExisting(
-        const Json::Value& config,
-        std::shared_ptr<arbiter::Arbiter> arbiter,
-        const std::string& outPath,
-        const std::string& tmpPath,
-        const std::size_t workThreads,
-        const std::size_t clipThreads)
+        const Config& config,
+        std::shared_ptr<arbiter::Arbiter> arbiter)
 {
-    std::unique_ptr<Builder> builder;
-    std::unique_ptr<std::size_t> subsetId;
-
-    if (config.isMember("subset"))
-    {
-        subsetId = makeUnique<std::size_t>(config["subset"]["id"].asUInt64());
-    }
-
     OuterScope os;
     os.setArbiter(arbiter);
-
-    return Builder::tryCreateExisting(
-            outPath,
-            tmpPath,
-            workThreads,
-            clipThreads,
-            subsetId.get(),
-            os);
+    return Builder::tryCreateExisting(config, os);
 }
 
-void ConfigParser::normalizeInput(
-        Json::Value& json,
-        const arbiter::Arbiter& arbiter)
+void ConfigParser::normalizeInput(Config& c, const arbiter::Arbiter& arbiter)
 {
-    Json::Value& input(json["input"]);
-    const bool verbose(json["verbose"].asBool());
+    Json::Value& input(c["input"]);
 
     const std::string extension(
             input.isString() ?
@@ -494,23 +408,16 @@ void ConfigParser::normalizeInput(
 
         input = inference["fileInfo"];
 
-        if (!json.isMember("schema")) json["schema"] = inference["schema"];
-        if (!json.isMember("bounds")) json["bounds"] = inference["bounds"];
-        if (!json.isMember("density")) json["density"] = inference["density"];
-        if (!json.isMember("numPointsHint"))
-        {
-            json["numPointsHint"] = inference["numPoints"];
-        }
-
-        if (inference.isMember("reprojection"))
-        {
-            json["reprojection"] = inference["reprojection"];
-        }
+        c.maybeSet("schema", inference["schema"]);
+        c.maybeSet("bounds", inference["bounds"]);
+        c.maybeSet("density", inference["density"]);
+        c.maybeSet("numPointsHint", inference["numPointsHint"]);
+        c.maybeSet("reprojection", inference["reprojection"]);
 
         if (Delta::existsIn(inference))
         {
-            if (!json.isMember("scale")) json["scale"] = inference["scale"];
-            if (!json.isMember("offset")) json["offset"] = inference["offset"];
+            c.maybeSet("scale", inference["scale"]);
+            c.maybeSet("offset", inference["offset"]);
         }
     }
 }

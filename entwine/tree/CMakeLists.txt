@@ -25,6 +25,7 @@ set(
     "${BASE}/climber.hpp"
     "${BASE}/clipper.hpp"
     "${BASE}/cold.hpp"
+    "${BASE}/config.hpp"
     "${BASE}/config-parser.hpp"
     "${BASE}/hierarchy.hpp"
     "${BASE}/hierarchy-block.hpp"

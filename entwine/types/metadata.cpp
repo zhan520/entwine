@@ -31,6 +31,7 @@ namespace
     const double epsilon(0.005);
 }
 
+/*
 Metadata::Metadata(
         const Bounds& boundsNativeConforming,
         const Schema& schema,
@@ -73,6 +74,7 @@ Metadata::Metadata(
 {
     if (!m_density) m_density = densityLowerBound(*m_manifest);
 }
+*/
 
 Metadata::Metadata(const arbiter::Endpoint& ep, const std::size_t* subsetId)
     : Metadata(([&ep, subsetId]()
@@ -148,7 +150,9 @@ Metadata::Metadata(const Json::Value& json)
     , m_trustHeaders(json["trustHeaders"].asBool())
     , m_slicedBase(json["baseType"].asString() == "sliced")
     , m_preserveSpatial(extract<std::string>(json["preserveSpatial"]))
-{ }
+{
+    if (!m_density) m_density = densityLowerBound(*m_manifest);
+}
 
 Metadata::Metadata(const Metadata& other)
     : m_delta(maybeClone(other.delta()))

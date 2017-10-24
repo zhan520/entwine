@@ -15,6 +15,7 @@
 #include <memory>
 #include <string>
 
+#include <entwine/tree/config.hpp>
 #include <entwine/tree/merger.hpp>
 
 using namespace entwine;

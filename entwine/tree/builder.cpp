@@ -21,6 +21,7 @@
 #include <entwine/tree/chunk.hpp>
 #include <entwine/tree/climber.hpp>
 #include <entwine/tree/clipper.hpp>
+#include <entwine/tree/config.hpp>
 #include <entwine/tree/heuristics.hpp>
 #include <entwine/tree/hierarchy-block.hpp>
 #include <entwine/tree/registry.hpp>
@@ -49,6 +50,7 @@ namespace
     const std::size_t inputRetryLimit(8);
 }
 
+/*
 Builder::Builder(
         const Metadata& metadata,
         const std::string outPath,
@@ -57,8 +59,8 @@ Builder::Builder(
         const std::size_t clipThreads,
         const OuterScope outerScope)
     : m_arbiter(outerScope.getArbiter())
-    , m_outEndpoint(makeUnique<Endpoint>(m_arbiter->getEndpoint(outPath)))
-    , m_tmpEndpoint(makeUnique<Endpoint>(m_arbiter->getEndpoint(tmpPath)))
+    , m_outEp(makeUnique<Endpoint>(m_arbiter->getEndpoint(outPath)))
+    , m_tmpEp(makeUnique<Endpoint>(m_arbiter->getEndpoint(tmpPath)))
     , m_threadPools(makeUnique<ThreadPools>(workThreads, clipThreads))
     , m_metadata(([this, &metadata]()
     {
@@ -66,15 +68,14 @@ Builder::Builder(
         m->manifest().awakenAll(m_threadPools->clipPool());
         return m;
     })())
-    , m_isContinuation(false)
     , m_pointPool(
             outerScope.getPointPool(m_metadata->schema(), m_metadata->delta()))
     , m_hierarchyPool(outerScope.getHierarchyPool(heuristics::poolBlockSize))
     , m_hierarchy(makeUnique<Hierarchy>(
                 *m_hierarchyPool,
                 *m_metadata,
-                *m_outEndpoint,
-                m_outEndpoint.get(),
+                *m_outEp,
+                m_outEp.get(),
                 false))
     , m_sequence(makeUnique<Sequence>(*this))
     , m_registry(makeUnique<Registry>(*this))
@@ -83,51 +84,79 @@ Builder::Builder(
 }
 
 Builder::Builder(
-        const std::string outPath,
-        const std::string tmpPath,
-        const std::size_t workThreads,
-        const std::size_t clipThreads,
+        const Config& config,
         const std::size_t* subsetId,
         const OuterScope outerScope)
     : m_arbiter(outerScope.getArbiter())
-    , m_outEndpoint(makeUnique<Endpoint>(m_arbiter->getEndpoint(outPath)))
-    , m_tmpEndpoint(makeUnique<Endpoint>(m_arbiter->getEndpoint(tmpPath)))
-    , m_threadPools(makeUnique<ThreadPools>(workThreads, clipThreads))
+    , m_outEp(makeUnique<Endpoint>(m_arbiter->getEndpoint(config.output())
+    , m_tmpEp(makeUnique<Endpoint>(m_arbiter->getEndpoint(config.tmp())))
+    , m_threadPools(makeUnique<ThreadPools>(
+            config.workThreads(),
+            config.clipThreads()))
     , m_metadata(([this, subsetId]()
     {
-        auto m(makeUnique<Metadata>(*m_outEndpoint, subsetId));
+        auto m(makeUnique<Metadata>(*m_outEp, subsetId));
         m->manifest().awakenAll(m_threadPools->clipPool());
         return m;
     })())
-    , m_isContinuation(true)
     , m_pointPool(
             outerScope.getPointPool(m_metadata->schema(), m_metadata->delta()))
     , m_hierarchyPool(outerScope.getHierarchyPool(heuristics::poolBlockSize))
     , m_hierarchy(makeUnique<Hierarchy>(
                 *m_hierarchyPool,
                 *m_metadata,
-                *m_outEndpoint,
-                m_outEndpoint.get(),
+                *m_outEp,
+                m_outEp.get(),
                 true))
     , m_sequence(makeUnique<Sequence>(*this))
     , m_registry(makeUnique<Registry>(*this, true))
 {
     prepareEndpoints();
 }
+*/
+
+Builder::Builder(const Config& config, const OuterScope outerScope)
+    : m_config(config)
+    , m_arbiter(outerScope.getArbiter())
+    , m_outEp(makeUnique<Endpoint>(m_arbiter->getEndpoint(m_config.output())))
+    , m_tmpEp(makeUnique<Endpoint>(m_arbiter->getEndpoint(m_config.tmp())))
+    , m_exists(!m_config.force() && m_outEp->tryGetSize(m_config.entwineFile()))
+    , m_threadPools(makeUnique<ThreadPools>(
+                m_config.workThreads(),
+                m_config.clipThreads()))
+    , m_metadata(([this]()
+    {
+        auto m = m_exists ?
+            makeUnique<Metadata>(*m_outEp, m_config.subsetId()) :
+            makeUnique<Metadata>(m_config);
+        m->manifest().awakenAll(m_threadPools->clipPool());
+        return m;
+    })())
+    , m_pointPool(
+            outerScope.getPointPool(m_metadata->schema(), m_metadata->delta()))
+    , m_hierarchyPool(outerScope.getHierarchyPool(heuristics::poolBlockSize))
+    , m_hierarchy(makeUnique<Hierarchy>(
+                *m_hierarchyPool,
+                *m_metadata,
+                *m_outEp,
+                m_outEp.get(),
+                m_exists))
+    , m_sequence(makeUnique<Sequence>(*this))
+    , m_registry(makeUnique<Registry>(*this, m_exists))
+    , m_verbose(m_config.verbose())
+{
+    prepareEndpoints();
+}
 
 std::unique_ptr<Builder> Builder::tryCreateExisting(
-        const std::string out,
-        const std::string tmp,
-        const std::size_t works,
-        const std::size_t clips,
-        const std::size_t* subsetId,
+        const Config& config,
         OuterScope os)
 {
-    const std::string postfix(Subset::postfix(subsetId));
+    const std::string file(config.entwineFile());
 
-    if (os.getArbiter()->getEndpoint(out).tryGetSize("entwine" + postfix))
+    if (os.getArbiter()->getEndpoint(config.output()).tryGetSize(file))
     {
-        return makeUnique<Builder>(out, tmp, works, clips, subsetId, os);
+        return makeUnique<Builder>(config, os);
     }
 
     return std::unique_ptr<Builder>();
@@ -138,7 +167,7 @@ Builder::~Builder()
 
 void Builder::go(std::size_t max)
 {
-    if (!m_tmpEndpoint)
+    if (!m_tmpEp)
     {
         throw std::runtime_error("Cannot add to read-only builder");
     }
@@ -152,13 +181,11 @@ void Builder::go(std::size_t max)
         if (verbose())
         {
             std::cout << "Adding " << origin << " - " << path << std::endl;
-            /*
             std::cout <<
                 " A: " << m_pointPool->cellPool().allocated() <<
                 " C: " << Chunk::count() <<
                 " H: " << HierarchyBlock::count() <<
                 std::endl;
-            */
         }
 
         m_threadPools->workPool().add([this, origin, &info, path]()
@@ -214,7 +241,7 @@ bool Builder::insertPath(const Origin origin, FileInfo& info)
     {
         try
         {
-            localHandle = m_arbiter->getLocalHandle(rawPath, *m_tmpEndpoint);
+            localHandle = m_arbiter->getLocalHandle(rawPath, *m_tmpEp);
         }
         catch (const ArbiterError& e)
         {
@@ -344,7 +371,7 @@ Cell::PooledStack Builder::insertData(
 
 void Builder::save()
 {
-    save(*m_outEndpoint);
+    save(*m_outEp);
 }
 
 void Builder::save(const std::string to)
@@ -360,10 +387,10 @@ void Builder::save(const arbiter::Endpoint& ep)
     m_hierarchy->save(m_threadPools->clipPool());
 
     if (verbose()) std::cout << "Saving registry..." << std::endl;
-    m_registry->save(*m_outEndpoint);
+    m_registry->save(*m_outEp);
 
     if (verbose()) std::cout << "Saving metadata..." << std::endl;
-    m_metadata->save(*m_outEndpoint);
+    m_metadata->save(*m_outEp);
 }
 
 void Builder::merge(Builder& other)
@@ -386,20 +413,20 @@ void Builder::merge(Builder& other)
 
 void Builder::prepareEndpoints()
 {
-    if (m_tmpEndpoint)
+    if (m_tmpEp)
     {
-        if (m_tmpEndpoint->isRemote())
+        if (m_tmpEp->isRemote())
         {
             throw std::runtime_error("Tmp path must be local");
         }
 
-        if (!arbiter::fs::mkdirp(m_tmpEndpoint->root()))
+        if (!arbiter::fs::mkdirp(m_tmpEp->root()))
         {
             throw std::runtime_error("Couldn't create tmp directory");
         }
 
-        const std::string rootDir(m_outEndpoint->root());
-        if (!m_outEndpoint->isRemote())
+        const std::string rootDir(m_outEp->root());
+        if (!m_outEp->isRemote())
         {
             if (!arbiter::fs::mkdirp(rootDir))
             {
@@ -452,8 +479,8 @@ std::shared_ptr<HierarchyCell::Pool> Builder::sharedHierarchyPool() const
     return m_hierarchyPool;
 }
 
-const arbiter::Endpoint& Builder::outEndpoint() const { return *m_outEndpoint; }
-const arbiter::Endpoint& Builder::tmpEndpoint() const { return *m_tmpEndpoint; }
+const arbiter::Endpoint& Builder::outEndpoint() const { return *m_outEp; }
+const arbiter::Endpoint& Builder::tmpEndpoint() const { return *m_tmpEp; }
 
 std::mutex& Builder::mutex() { return m_mutex; }
 

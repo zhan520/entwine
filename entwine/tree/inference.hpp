@@ -70,6 +70,7 @@ public:
             bool cesiumify = false,
             arbiter::Arbiter* arbiter = nullptr);
 
+    // Continuation build.
     Inference(Builder& builder, const FileInfoList& fileInfo);
 
     Inference(const Json::Value& json);
