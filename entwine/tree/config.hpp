@@ -26,6 +26,8 @@ namespace entwine
 class Config
 {
 public:
+    Config() { }
+
     Config(const Json::Value& json)
         : m_json(json)
     {

@@ -279,6 +279,7 @@ void Kernel::infer(std::vector<std::string> args)
     const bool verbose(true);
     const bool cesiumify(false);
 
+    /*
     Inference inference(
             paths,
             reprojection.get(),
@@ -324,5 +325,6 @@ void Kernel::infer(std::vector<std::string> args)
 
     const double density(densityLowerBound(inference.fileInfo()));
     std::cout << "Density estimate (per square unit): " << density << std::endl;
+    */
 }
 

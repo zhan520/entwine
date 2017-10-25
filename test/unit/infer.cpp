@@ -6,6 +6,7 @@
 
 using namespace entwine;
 
+/*
 namespace
 {
 
@@ -179,4 +180,5 @@ TEST(Infer, TrustHeaders)
                 nycCenter + nominalBounds.min(),
                 nycCenter + nominalBounds.max()));
 }
+*/
 

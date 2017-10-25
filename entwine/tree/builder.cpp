@@ -152,11 +152,13 @@ std::unique_ptr<Builder> Builder::tryCreateExisting(
         const Config& config,
         OuterScope os)
 {
-    const std::string file(config.entwineFile());
-
-    if (os.getArbiter()->getEndpoint(config.output()).tryGetSize(file))
+    if (!config.force())
     {
-        return makeUnique<Builder>(config, os);
+        const std::string file(config.entwineFile());
+        if (os.getArbiter()->getEndpoint(config.output()).tryGetSize(file))
+        {
+            return makeUnique<Builder>(config, os);
+        }
     }
 
     return std::unique_ptr<Builder>();

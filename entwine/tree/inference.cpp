@@ -40,6 +40,14 @@ namespace
     });
 }
 
+Inference::Inference(const Config& config)
+    : m_config(config)
+    , m_pointPool(xyzSchema, nullptr)
+    , m_arbiter(m_config.arbiter())
+    , m_tmp(m_arbiter.getEndpoint(m_config.tmp()))
+{ }
+
+/*
 Inference::Inference(
         const FileInfoList& fileInfo,
         const Reprojection* reprojection,
@@ -141,6 +149,7 @@ Inference::Inference(
         m_fileInfo.emplace_back(f);
     }
 }
+*/
 
 void Inference::go()
 {
@@ -157,7 +166,7 @@ void Inference::go()
         FileInfo& f(m_fileInfo[i]);
         m_index = i;
 
-        if (m_verbose)
+        if (m_config.verbose())
         {
             std::cout << i + 1 << " / " << size << ": " << f.path() <<
                 std::endl;
@@ -165,11 +174,11 @@ void Inference::go()
 
         if (Executor::get().good(f.path()))
         {
-            if (m_arbiter->isHttpDerived(f.path()))
+            if (m_arbiter.isHttpDerived(f.path()))
             {
                 m_pool->add([this, &f]()
                 {
-                    const auto data(m_arbiter->getBinary(f.path(), range));
+                    const auto data(m_arbiter.getBinary(f.path(), range));
 
                     std::string name(f.path());
                     std::replace(name.begin(), name.end(), '/', '-');
@@ -187,7 +196,7 @@ void Inference::go()
                 m_pool->add([&f, this]()
                 {
                     auto localHandle(
-                        m_arbiter->getLocalHandle(f.path(), m_tmp));
+                        m_arbiter.getLocalHandle(f.path(), m_tmp));
 
                     add(localHandle->localPath(), f);
                 });
@@ -554,6 +563,7 @@ Json::Value Inference::toJson() const
     return json;
 }
 
+/*
 Inference::Inference(const Json::Value& json)
     : m_pointPool(xyzSchema, nullptr)
     , m_valid(true)
@@ -570,6 +580,7 @@ Inference::Inference(const Json::Value& json)
     , m_delta(Delta::maybeCreate(json))
     , m_fileInfo(toFileInfo(json["fileInfo"]))
 { }
+*/
 
 } // namespace entwine
 

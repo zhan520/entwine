@@ -43,10 +43,6 @@ private:
             Config& config,
             const arbiter::Arbiter& arbiter);
 
-    static std::unique_ptr<Builder> tryGetExisting(
-            const Config& config,
-            std::shared_ptr<arbiter::Arbiter> arbiter);
-
     static void infer(Config& config);
 
     static std::unique_ptr<Subset> maybeAccommodateSubset(

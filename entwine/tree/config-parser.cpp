@@ -99,11 +99,15 @@ std::unique_ptr<Builder> ConfigParser::getBuilder(
     */
 
     normalizeInput(config, *arbiter);
-    auto fileInfo(extract<FileInfo>(config["input"]));
 
     if (!config.force())
     {
-        if (auto builder = tryGetExisting(config, arbiter))
+        const auto input(extract<FileInfo>(config["input"]));
+
+        OuterScope os;
+        os.setArbiter(arbiter);
+
+        if (auto builder = Builder::tryCreateExisting(config, os))
         {
             if (config.verbose())
             {
@@ -111,15 +115,15 @@ std::unique_ptr<Builder> ConfigParser::getBuilder(
             }
 
             // Only scan for files that aren't already in the index.
-            fileInfo = builder->metadata().manifest().diff(fileInfo);
+            auto diff(builder->metadata().manifest().diff(input));
 
-            if (fileInfo.size())
+            if (diff.size())
             {
-                Inference inference(*builder, fileInfo);
+                Inference inference(*builder, diff);
                 inference.go();
-                fileInfo = inference.fileInfo();
+                diff = inference.fileInfo();
 
-                std::cout << "Adding " << fileInfo.size() << " new files" <<
+                std::cout << "Adding " << diff.size() << " new files" <<
                     std::endl;
             }
 
@@ -129,7 +133,7 @@ std::unique_ptr<Builder> ConfigParser::getBuilder(
             //
             // It's plausible that the input field could be empty to continue
             // a previous build.
-            if (config["input"].isArray()) builder->append(fileInfo);
+            if (config["input"].isArray()) builder->append(diff);
             return builder;
         }
     }
@@ -149,6 +153,8 @@ std::unique_ptr<Builder> ConfigParser::getBuilder(
 
     if (needsInference)
     {
+        infer(config);
+        /*
         if (config.verbose())
         {
             std::cout << "Performing dataset inference..." << std::endl;
@@ -277,8 +283,10 @@ std::unique_ptr<Builder> ConfigParser::getBuilder(
                 transformation = makeUnique<std::vector<double>>(*t);
             }
         }
+        */
     }
 
+    /*
     auto subset(maybeAccommodateSubset(json, *boundsConforming, delta.get()));
     json["numPointsHint"] = static_cast<Json::UInt64>(numPointsHint);
 
@@ -304,7 +312,6 @@ std::unique_ptr<Builder> ConfigParser::getBuilder(
     const Manifest manifest(fileInfo, ep);
 
     const Metadata metadata(json);
-    /*
             *boundsConforming,
             *schema,
             structure,
@@ -320,7 +327,6 @@ std::unique_ptr<Builder> ConfigParser::getBuilder(
             transformation.get(),
             cesiumSettings.get(),
             preserveSpatial);
-    */
 
     OuterScope outerScope;
     outerScope.setArbiter(arbiter);
@@ -332,18 +338,131 @@ std::unique_ptr<Builder> ConfigParser::getBuilder(
             workThreads,
             clipThreads,
             outerScope);
+    */
 
-    if (verbose) builder->verbose(true);
-    return builder;
+    return std::unique_ptr<Builder>();
 }
 
-std::unique_ptr<Builder> ConfigParser::tryGetExisting(
-        const Config& config,
-        std::shared_ptr<arbiter::Arbiter> arbiter)
+void ConfigParser::infer(Config& config)
 {
-    OuterScope os;
-    os.setArbiter(arbiter);
-    return Builder::tryCreateExisting(config, os);
+    if (config.verbose()) std::cout << "Scanning files..." << std::endl;
+
+    Inference inference(config);
+
+    /*
+    if (transformation)
+    {
+        inference.transformation(*transformation);
+    }
+
+    inference.go();
+
+    // Overwrite our initial fileInfo with the inferred version, which
+    // contains details for each file instead of just paths.
+    fileInfo = inference.fileInfo();
+
+    if (!absolute && inference.delta())
+    {
+        if (!delta) delta = makeUnique<Delta>();
+
+        if (!json.isMember("scale"))
+        {
+            delta->scale() = inference.delta()->scale();
+        }
+
+        if (!json.isMember("offset"))
+        {
+            delta->offset() = inference.delta()->offset();
+        }
+    }
+
+    if (!boundsConforming)
+    {
+        boundsConforming = makeUnique<Bounds>(inference.bounds());
+
+        if (verbose)
+        {
+            std::cout << "Inferred: " << inference.bounds() << std::endl;
+        }
+    }
+    else if (delta)
+    {
+        // If we were passed a bounds initially, it might not match the
+        // inference we just performed.  Make sure our offset is consistent
+        // with what we'll use as our bounds later.
+        delta->offset() = boundsConforming->mid().apply([](double d)
+        {
+            const int64_t v(d);
+            if (static_cast<double>(v / 10 * 10) == d) return v;
+            else return (v + 10) / 10 * 10;
+        });
+    }
+
+    if (!schema)
+    {
+        auto dims(inference.schema().dims());
+        if (delta)
+        {
+            const Bounds cube(
+                    Metadata::makeScaledCube(
+                        *boundsConforming,
+                        delta.get()));
+            dims = Schema::deltify(cube, *delta, inference.schema()).dims();
+        }
+
+        const std::size_t pointIdSize([&fileInfo]()
+        {
+            std::size_t max(0);
+            for (const auto& f : fileInfo)
+            {
+                max = std::max(max, f.numPoints());
+            }
+
+            if (max <= std::numeric_limits<uint32_t>::max()) return 4;
+            else return 8;
+        }());
+
+        const std::size_t originSize([&fileInfo]()
+        {
+            if (fileInfo.size() <= std::numeric_limits<uint16_t>::max())
+                return 2;
+            if (fileInfo.size() <= std::numeric_limits<uint32_t>::max())
+                return 4;
+            else
+                return 8;
+        }());
+
+        for (const auto s : preserveSpatial)
+        {
+            if (std::none_of(
+                        dims.begin(),
+                        dims.end(),
+                        [s](const DimInfo& d) { return d.name() == s; }))
+            {
+                dims.emplace_back(s, "floating", 8);
+            }
+        }
+
+        dims.emplace_back("OriginId", "unsigned", originSize);
+
+        if (storePointId)
+        {
+            dims.emplace_back("PointId", "unsigned", pointIdSize);
+        }
+
+        schema = makeUnique<Schema>(dims);
+    }
+
+    if (!numPointsHint) numPointsHint = inference.numPoints();
+
+    if (!transformation)
+    {
+        if (const std::vector<double>* t = inference.transformation())
+        {
+            transformation = makeUnique<std::vector<double>>(*t);
+        }
+    }
+    */
 }
 
 void ConfigParser::normalizeInput(Config& c, const arbiter::Arbiter& arbiter)
@@ -362,11 +481,11 @@ void ConfigParser::normalizeInput(Config& c, const arbiter::Arbiter& arbiter)
         // need to expand out directories into their containing files.
         FileInfoList fileInfo;
 
-        auto insert([&fileInfo, &arbiter, verbose](std::string in)
+        auto insert([&c, &fileInfo, &arbiter](std::string in)
         {
-            Paths current(arbiter.resolve(in, verbose));
+            Paths current(arbiter.resolve(in, c.verbose()));
             std::sort(current.begin(), current.end());
-            for (const auto& c : current) fileInfo.emplace_back(c);
+            for (const auto& f : current) fileInfo.emplace_back(f);
         });
 
         if (input.isArray())

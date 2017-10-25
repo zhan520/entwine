@@ -19,6 +19,7 @@
 #include <pdal/SpatialReference.hpp>
 
 #include <entwine/third/arbiter/arbiter.hpp>
+#include <entwine/tree/config.hpp>
 #include <entwine/types/bounds.hpp>
 #include <entwine/types/delta.hpp>
 #include <entwine/types/file-info.hpp>
@@ -36,6 +37,7 @@ class Reprojection;
 class Inference
 {
 public:
+    /*
     Inference(
             const FileInfoList& fileInfo,
             const Reprojection* reprojection = nullptr,
@@ -69,11 +71,12 @@ public:
             bool verbose = false,
             bool cesiumify = false,
             arbiter::Arbiter* arbiter = nullptr);
+    */
 
     // Continuation build.
     Inference(Builder& builder, const FileInfoList& fileInfo);
 
-    Inference(const Json::Value& json);
+    Inference(const Config& config);
 
     void go();
     bool done() const { return m_done; }
@@ -111,12 +114,13 @@ private:
     void add(std::string localPath, FileInfo& fileInfo);
     Transformation calcTransformation();
 
-    std::string m_tmpPath;
-
+    const Config m_config;
     PointPool m_pointPool;
+    arbiter::Arbiter m_arbiter;
+    arbiter::Endpoint m_tmp;
+
     std::unique_ptr<Reprojection> m_reproj;
     std::size_t m_threads = 4;
-    bool m_verbose = true;
     bool m_trustHeaders = true;
     bool m_allowDelta = true;
     bool m_valid = false;
@@ -125,9 +129,6 @@ private:
     std::unique_ptr<Transformation> m_transformation;
 
     std::unique_ptr<Pool> m_pool;
-    std::unique_ptr<arbiter::Arbiter> m_ownedArbiter;
-    arbiter::Arbiter* m_arbiter;
-    arbiter::Endpoint m_tmp;
     std::size_t m_index = 0;
 
     std::vector<std::string> m_dimVec;

@@ -11,6 +11,7 @@
 #pragma once
 
 #include <entwine/third/arbiter/arbiter.hpp>
+#include <entwine/tree/hierarchy-block.hpp>
 #include <entwine/types/point-pool.hpp>
 
 namespace entwine

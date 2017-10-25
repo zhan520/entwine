@@ -117,9 +117,7 @@ public:
     void unbump();
 
     void append(const FileInfoList& fileInfo);
-
     bool verbose() const { return m_verbose; }
-    void verbose(bool v) { m_verbose = v; }
 
 private:
     std::mutex& mutex();
