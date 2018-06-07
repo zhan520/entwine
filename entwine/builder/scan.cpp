@@ -206,6 +206,7 @@ Config Scan::aggregate()
     if (out["bounds"].isNull()) out["bounds"] = bounds.toJson();
     bounds = Bounds(out["bounds"]);
 
+    // TODO.
     // if (out.scale() != 1)
     {
         DimList dims
